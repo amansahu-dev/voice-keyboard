@@ -10,75 +10,152 @@ import os
 # Must be the first Streamlit command
 st.set_page_config(page_title="Voice Keyboard Assistant", page_icon="🎤")
 
-# Initialize state variables
-if 'can_record_audio' not in st.session_state:
-    st.session_state.can_record_audio = False
-if 'error_message' not in st.session_state:
-    st.session_state.error_message = None
-if 'is_cloud' not in st.session_state:
-    st.session_state.is_cloud = True  # Default to cloud/no-display mode
-
-# Check for required packages
-try:
-    import speech_recognition as sr
-    import pyttsx3
-    import pyaudio
-    st.session_state.can_record_audio = True
-except ImportError as e:
-    if "pyaudio" in str(e).lower():
-        st.session_state.error_message = """
-        ⚠️ PyAudio is not installed. This is required for microphone access.
+def request_microphone_permission():
+    """Request microphone permission using Streamlit's audio recorder"""
+    st.info("⚠️ Microphone access is required for this application.")
+    
+    # Use Streamlit's audio recorder to trigger browser permission
+    audio_permission = st.audio_recorder(
+        text="Click here to enable microphone access",
+        recording_color="#e8b62c",
+        neutral_color="#6c757d"
+    )
+    
+    if audio_permission is not None:
+        st.session_state.microphone_permitted = True
+        st.success("✅ Microphone access granted! You can now use voice commands.")
+        st.rerun()
+    elif 'microphone_permitted' not in st.session_state:
+        st.warning("""
+        👆 Please click the button above to enable microphone access.
         
-        To install PyAudio:
-        - Windows: `pip install pipwin` followed by `pipwin install pyaudio`
-        - Linux: `sudo apt-get install python3-pyaudio`
-        - Mac: `brew install portaudio` followed by `pip install pyaudio`
-        
-        For cloud deployment:
-        This application requires microphone access and cannot run in a cloud environment.
-        Please run it locally on your computer.
-        """
-    else:
-        st.session_state.error_message = f"Missing required package: {str(e)}"
-except Exception as e:
-    st.session_state.error_message = f"Error initializing audio: {str(e)}"
+        If you don't see a permission prompt:
+        1. Check your browser settings
+        2. Make sure microphone access isn't blocked
+        3. Try using a different browser (Chrome recommended)
+        """)
 
-# Check if running in cloud or if display is available
-try:
-    # Only try to import pyautogui if we're in a suitable environment
-    if sys.platform.startswith('win'):  # Windows
-        import pyautogui
-        st.session_state.is_cloud = False
-    elif sys.platform.startswith('darwin'):  # macOS
-        import pyautogui
-        st.session_state.is_cloud = False
-    elif sys.platform.startswith('linux'):  # Linux
-        # Check if running in a desktop environment
-        if os.environ.get('DISPLAY') or os.environ.get('WAYLAND_DISPLAY'):
-            import pyautogui
-            st.session_state.is_cloud = False
-        else:
-            st.info("No display available. Running in cloud/demo mode.")
-    else:
-        st.info("Unsupported platform. Running in cloud/demo mode.")
-except ImportError:
-    st.info("PyAutoGUI not available. Running in cloud/demo mode.")
-except Exception as e:
-    st.info(f"Display access error. Running in cloud/demo mode. Error: {str(e)}")
-
-# Initialize PyAutoGUI if available
-if not st.session_state.is_cloud:
+def check_environment():
+    """Check the running environment and available features"""
+    env_info = {
+        'can_record_audio': False,
+        'is_cloud': True,
+        'error_message': None,
+        'needs_permission': False
+    }
+    
+    # Check if we're running in the cloud
+    if os.path.exists('/mount/src'):
+        try:
+            # Try to import required packages first
+            import speech_recognition as sr
+            import pyaudio
+            
+            # If imports succeed, we might be able to use microphone with permission
+            env_info['needs_permission'] = True
+            env_info['error_message'] = None
+            return env_info
+            
+        except ImportError as e:
+            env_info['error_message'] = """
+            ⚠️ Audio libraries not available in cloud environment.
+            
+            This application requires local installation to work properly because it needs:
+            1. Microphone access
+            2. System keyboard control
+            
+            To run locally:
+            1. Clone the repository
+            2. Install dependencies:
+               ```
+               pip install streamlit SpeechRecognition pyttsx3 PyAutoGUI
+               
+               # For Windows:
+               # Download PyAudio wheel from https://www.lfd.uci.edu/~gohlke/pythonlibs/#pyaudio
+               # Then: pip install PyAudio-0.2.13-cp311-cp311-win_amd64.whl
+               
+               # For Linux:
+               # sudo apt-get install python3-pyaudio
+               
+               # For Mac:
+               # brew install portaudio
+               # pip install pyaudio
+               ```
+            3. Run: streamlit run voice_keyboard.py
+            """
+            return env_info
+    
+    # Try to import required packages
     try:
-        pyautogui.FAILSAFE = False
-    except Exception:
-        st.session_state.is_cloud = True
-        st.info("Failed to initialize PyAutoGUI. Running in cloud/demo mode.")
+        import speech_recognition as sr
+        import pyttsx3
+        import pyaudio
+        env_info['can_record_audio'] = True
+    except ImportError as e:
+        if "pyaudio" in str(e).lower():
+            env_info['error_message'] = """
+            ⚠️ PyAudio is not installed. This is required for microphone access.
+            
+            Installation instructions:
+            
+            Windows:
+            1. Download PyAudio wheel from: https://www.lfd.uci.edu/~gohlke/pythonlibs/#pyaudio
+               - For Python 3.11: PyAudio-0.2.13-cp311-cp311-win_amd64.whl
+            2. Install with: pip install PyAudio-0.2.13-cp311-cp311-win_amd64.whl
+            
+            Linux:
+            - Run: sudo apt-get install python3-pyaudio
+            
+            Mac:
+            1. Run: brew install portaudio
+            2. Run: pip install pyaudio
+            """
+        else:
+            env_info['error_message'] = f"Missing required package: {str(e)}"
+        return env_info
+    
+    # Check for display access
+    try:
+        if sys.platform.startswith('win'):  # Windows
+            import pyautogui
+            env_info['is_cloud'] = False
+        elif sys.platform.startswith('darwin'):  # macOS
+            import pyautogui
+            env_info['is_cloud'] = False
+        elif sys.platform.startswith('linux'):  # Linux
+            if os.environ.get('DISPLAY') or os.environ.get('WAYLAND_DISPLAY'):
+                import pyautogui
+                env_info['is_cloud'] = False
+    except ImportError:
+        env_info['error_message'] = "PyAutoGUI not available. Running in demo mode."
+    except Exception as e:
+        env_info['error_message'] = f"Display access error: {str(e)}"
+    
+    return env_info
+
+# Initialize environment
+if 'env_checked' not in st.session_state:
+    env_info = check_environment()
+    st.session_state.update(env_info)
+    st.session_state.env_checked = True
 
 class VoiceKeyboard:
     def __init__(self):
         self.is_cloud = st.session_state.is_cloud
+        self.pyautogui = None
         
-        if st.session_state.can_record_audio:
+        # Initialize PyAutoGUI if not in cloud mode
+        if not self.is_cloud:
+            try:
+                import pyautogui
+                self.pyautogui = pyautogui
+                self.pyautogui.FAILSAFE = False
+            except Exception as e:
+                st.error(f"Failed to initialize PyAutoGUI: {str(e)}")
+                self.is_cloud = True
+        
+        if st.session_state.can_record_audio or (st.session_state.needs_permission and st.session_state.get('microphone_permitted', False)):
+            import speech_recognition as sr
             self.recognizer = sr.Recognizer()
             
             # Initialize text-to-speech only if not in cloud
@@ -224,39 +301,61 @@ class VoiceKeyboard:
             }
 
     def execute_command(self, command):
-        """Execute a command with proper timing"""
-        if self.is_cloud:
-            # In cloud environment, just display the command
-            if isinstance(command, list):
-                if isinstance(command[0], list):
-                    st.write(f"Command sequence received: {command}")
-                else:
-                    st.write(f"Hotkey command received: {'+'.join(command)}")
-            else:
-                st.write(f"Key command received: {command}")
-            return False
+        """Execute a keyboard command"""
+        if self.is_cloud or not self.pyautogui:
+            st.write(f"Demo Mode - Would execute: {command}")
+            return
             
-        if command == 'stop':
-            return True
-        
         try:
-            if isinstance(command, list):
-                # Handle nested commands (for complex operations)
-                if isinstance(command[0], list):
-                    for cmd in command:
-                        pyautogui.hotkey(*cmd)
-                        time.sleep(0.1)
-                else:
-                    pyautogui.hotkey(*command)
+            if command == "copy":
+                self.pyautogui.hotkey('ctrl', 'c')
+            elif command == "paste":
+                self.pyautogui.hotkey('ctrl', 'v')
+            elif command == "select all":
+                self.pyautogui.hotkey('ctrl', 'a')
+            elif command == "undo":
+                self.pyautogui.hotkey('ctrl', 'z')
+            elif command == "redo":
+                self.pyautogui.hotkey('ctrl', 'y')
+            elif command == "save":
+                self.pyautogui.hotkey('ctrl', 's')
+            elif command == "cut":
+                self.pyautogui.hotkey('ctrl', 'x')
+            elif command == "new line":
+                self.pyautogui.press('enter')
+            elif command == "tab":
+                self.pyautogui.press('tab')
+            elif command == "space":
+                self.pyautogui.press('space')
+            elif command == "backspace":
+                self.pyautogui.press('backspace')
+            elif command == "delete":
+                self.pyautogui.press('delete')
+            elif command == "up":
+                self.pyautogui.press('up')
+            elif command == "down":
+                self.pyautogui.press('down')
+            elif command == "left":
+                self.pyautogui.press('left')
+            elif command == "right":
+                self.pyautogui.press('right')
+            elif command == "home":
+                self.pyautogui.press('home')
+            elif command == "end":
+                self.pyautogui.press('end')
+            elif command == "page up":
+                self.pyautogui.press('pageup')
+            elif command == "page down":
+                self.pyautogui.press('pagedown')
+            elif command == "escape":
+                self.pyautogui.press('esc')
             else:
-                pyautogui.press(command)
-            
-            time.sleep(0.05)
+                # Type the command as text
+                self.pyautogui.write(command)
         except Exception as e:
             st.error(f"Error executing command: {str(e)}")
-            self.is_cloud = True  # Switch to cloud mode if command execution fails
-        
-        return False
+            self.is_cloud = True
+            self.pyautogui = None
 
     def type_symbol(self, symbol_name):
         """Handle typing of symbols"""
@@ -269,11 +368,11 @@ class VoiceKeyboard:
             try:
                 symbol = self.symbols[symbol_name]
                 if len(symbol) == 2:  # For paired symbols like (), [], {}
-                    pyautogui.write(symbol[0])
-                    pyautogui.write(symbol[1])
-                    pyautogui.press('left')
+                    self.pyautogui.write(symbol[0])
+                    self.pyautogui.write(symbol[1])
+                    self.pyautogui.press('left')
                 else:
-                    pyautogui.write(symbol)
+                    self.pyautogui.write(symbol)
                 return True
             except Exception as e:
                 st.error(f"Error typing symbol: {str(e)}")
@@ -290,62 +389,33 @@ class VoiceKeyboard:
                 st.warning(f"Text-to-speech failed: {str(e)}")
 
     def process_command(self, text):
-        """Process the voice command and perform actions"""
-        if not text:
-            return False
-
-        # Convert to lowercase and get words
+        """Process voice command and execute appropriate action"""
         text = text.lower().strip()
-        words = text.split()
-
-        # Check for stop commands first
-        stop_commands = ['stop listening', 'stop recording', 'stop now', 'finish', 'end recording']
-        if text in stop_commands:
+        
+        # Check for stop commands
+        if text in ["stop listening", "stop now", "finish"]:
             return True
-
-        # Try to match the longest possible command first
-        i = 0
-        while i < len(words):
-            # Try three-word commands
-            if i + 2 < len(words):
-                three_word_cmd = f"{words[i]} {words[i+1]} {words[i+2]}"
-                if three_word_cmd in self.special_commands:
-                    command = self.special_commands[three_word_cmd]
-                    self.execute_command(command)
-                    i += 3
-                    continue
-
-            # Try two-word commands
-            if i + 1 < len(words):
-                two_word_cmd = f"{words[i]} {words[i+1]}"
-                if two_word_cmd in self.special_commands:
-                    command = self.special_commands[two_word_cmd]
-                    self.execute_command(command)
-                    i += 2
-                    continue
-
-            # Try single-word commands
-            if words[i] in self.special_commands:
-                command = self.special_commands[words[i]]
-                self.execute_command(command)
-                i += 1
-                continue
-
-            # Check for capitalization
-            if words[i] == "capital" and i + 1 < len(words):
-                pyautogui.write(words[i + 1].capitalize())
-                i += 2
-                continue
-
-            # If no command matched, type the word
-            pyautogui.write(words[i] + " ")
-            i += 1
-
+            
+        # Navigation commands
+        if text in ["go left", "go right", "word left", "word right"]:
+            direction = text.split()[-1]
+            if not self.is_cloud and self.pyautogui:
+                self.pyautogui.press(direction)
+            else:
+                st.write(f"Demo Mode - Would navigate: {direction}")
+            return False
+            
+        # Special commands
+        if text.startswith("type "):
+            text = text[5:]  # Remove "type " prefix
+        
+        # Execute the command
+        self.execute_command(text)
         return False
 
     def listen(self):
         """Listen for voice input"""
-        if not st.session_state.can_record_audio:
+        if not (st.session_state.can_record_audio or (st.session_state.needs_permission and st.session_state.get('microphone_permitted', False))):
             st.error("Audio recording is not available")
             return ""
             
@@ -367,27 +437,29 @@ class VoiceKeyboard:
                     return ""
         except Exception as e:
             st.error(f"Error accessing microphone: {str(e)}")
-            st.session_state.can_record_audio = False
+            if 'microphone_permitted' in st.session_state:
+                del st.session_state.microphone_permitted
             return ""
 
 def main():
     st.title("Voice Keyboard Assistant 🎤")
     
+    # Check if we need to request microphone permission
+    if st.session_state.needs_permission and not st.session_state.get('microphone_permitted', False):
+        request_microphone_permission()
+        return
+    
+    # Display any error messages first
+    if st.session_state.error_message:
+        st.error(st.session_state.error_message)
+        return
+    
     # Create tabs for different sections
     main_tab, info_tab = st.tabs(["Main", "System Information"])
     
     with main_tab:
-        # Display any error messages
-        if st.session_state.error_message:
-            st.error(st.session_state.error_message)
-            st.warning("""
-            This application requires local installation to work properly.
-            Please follow the installation instructions above and run it locally.
-            """)
-            return
-
         # Display environment information
-        if st.session_state.is_cloud:
+        if st.session_state.is_cloud and not st.session_state.get('microphone_permitted', False):
             st.warning("""
             ⚠️ **Cloud/Demo Mode Active**
             
@@ -412,8 +484,13 @@ def main():
         col1, col2 = st.columns(2)
         
         with col1:
-            if st.button("Start Listening", type="primary", disabled=not st.session_state.can_record_audio):
-                if not st.session_state.can_record_audio:
+            if st.button("Start Listening", type="primary", 
+                        disabled=not (st.session_state.can_record_audio or 
+                                    (st.session_state.needs_permission and 
+                                     st.session_state.get('microphone_permitted', False)))):
+                if not (st.session_state.can_record_audio or 
+                       (st.session_state.needs_permission and 
+                        st.session_state.get('microphone_permitted', False))):
                     st.error("Cannot start listening - audio recording is not available")
                     return
                     
@@ -442,7 +519,7 @@ def main():
         st.write(f"Platform: {platform.platform()}")
         st.write(f"Python Version: {platform.python_version()}")
         st.write(f"Display Available: {bool(os.environ.get('DISPLAY') or os.environ.get('WAYLAND_DISPLAY'))}")
-        st.write(f"Audio Available: {st.session_state.can_record_audio}")
+        st.write(f"Audio Available: {st.session_state.can_record_audio or (st.session_state.needs_permission and st.session_state.get('microphone_permitted', False))}")
         st.write(f"Mode: {'Cloud/Demo' if st.session_state.is_cloud else 'Full Functionality'}")
         
         if st.session_state.error_message:
