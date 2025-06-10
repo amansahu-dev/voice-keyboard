@@ -1,160 +1,98 @@
 # Voice Keyboard Assistant
 
-A Python-based voice-controlled keyboard assistant that allows you to type and control your keyboard using voice commands.
+A voice-controlled keyboard assistant that allows you to control your computer using voice commands.
 
-## Features
+## Requirements
+- Windows 10 or later
+- Python 3.11 or later
+- Working microphone
 
-- Voice-to-text input
-- Special key commands (Enter, Space, Tab, etc.)
-- Capitalization control
-- Real-time voice recognition
-- User-friendly Streamlit interface
-- Text-to-speech feedback
+## Installation
 
-## Local Development Setup
-
-1. Clone the repository:
-```bash
-git clone <your-repo-url>
-cd python-voice-tool
-```
-
-2. Create and activate virtual environment:
+1. Create a virtual environment:
 ```bash
 python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+venv\Scripts\activate
 ```
 
-3. Install dependencies:
+2. Install PyAudio (Windows):
+- Download the appropriate PyAudio wheel for your Python version from:
+  https://www.lfd.uci.edu/~gohlke/pythonlibs/#pyaudio
+  - For Python 3.11: `PyAudio‑0.2.13‑cp311‑cp311‑win_amd64.whl`
+  - For Python 3.10: `PyAudio‑0.2.13‑cp310‑cp310‑win_amd64.whl`
+
+```bash
+# Replace XX with your Python version (e.g., 311 for Python 3.11)
+pip install PyAudio‑0.2.13‑cpXXX‑cpXXX‑win_amd64.whl
+```
+
+3. Install other dependencies:
 ```bash
 pip install -r requirements.txt
 ```
 
-4. Run the application locally:
+## Usage
+
+1. Start the application:
 ```bash
 streamlit run voice_keyboard.py
 ```
 
-## Deployment
+2. Click "Start Listening" to begin voice recognition
+3. Speak commands naturally
+4. Click "Stop" to stop listening
 
-### Deploy to Streamlit Cloud
+## Available Commands
 
-1. Push your code to GitHub:
-```bash
-git init
-git add .
-git commit -m "Initial commit"
-git branch -M main
-git remote add origin <your-github-repo-url>
-git push -u origin main
-```
+### Basic Navigation
+- "enter", "next line", "new line"
+- "space", "tab"
+- "backspace", "delete"
+- "escape"
 
-2. Go to [Streamlit Cloud](https://streamlit.io/cloud)
-3. Sign in with your GitHub account
-4. Click "New app"
-5. Select your repository and branch
-6. Set the main file path as: `voice_keyboard.py`
-7. Click "Deploy"
+### Word Operations
+- "remove word", "delete word"
+- "capital [word]" (capitalizes next word)
+- "all caps" (toggles caps lock)
 
-### Updating the Deployed Application
+### Navigation
+- "go left", "go right", "go up", "go down"
+- "word left", "word right"
+- "go to start", "go to end"
+- "line start", "line end"
 
-1. Make changes to your code locally
-2. Test the changes:
-```bash
-streamlit run voice_keyboard.py
-```
+### Selection
+- "select word", "select line"
+- "select next word", "select previous word"
+- "select up", "select down"
+- "select all"
 
-3. Commit and push changes:
-```bash
-git add .
-git commit -m "Description of changes"
-git push
-```
+### Copy/Paste
+- "copy", "paste", "cut"
+- "copy line", "cut line"
+- "copy word", "cut word"
+- "undo", "redo"
 
-4. Streamlit Cloud will automatically detect the changes and redeploy your app
-
-## Important Notes
-
-1. **Automatic Updates**: Streamlit Cloud automatically redeploys your app when you push changes to the connected GitHub repository.
-
-2. **Environment Variables**: If you add any environment variables or secrets:
-   - Add them to Streamlit Cloud's deployment settings
-   - Never commit sensitive information to Git
-
-3. **Dependencies**: If you update `requirements.txt`:
-   - The changes will be automatically detected
-   - New dependencies will be installed during redeployment
-
-4. **Browser Permissions**: Users will need to grant microphone permissions when using the deployed app
+### Symbols
+- Quotes: "double quote", "single quote"
+- Brackets: "open bracket", "close bracket", "square bracket"
+- Punctuation: "comma", "period", "semicolon"
+- Math: "plus", "minus", "equals"
+- Special: "underscore", "at sign", "hash"
 
 ## Troubleshooting
 
-1. If PyAudio installation fails:
-   - Windows: `pip install pipwin` followed by `pipwin install pyaudio`
-   - Linux: `sudo apt-get install python3-pyaudio`
-   - Mac: `brew install portaudio` followed by `pip install pyaudio`
+1. If microphone isn't working:
+   - Check Windows microphone permissions
+   - Set your microphone as the default recording device
+   - Try running the application as administrator
 
-2. If the app doesn't update after pushing changes:
-   - Check the deployment logs in Streamlit Cloud
-   - Ensure all dependencies are in `requirements.txt`
-   - Try forcing a manual redeployment in Streamlit Cloud
+2. If keyboard commands aren't working:
+   - Ensure the application has necessary permissions
+   - Try running as administrator
+   - Check if any antivirus is blocking PyAutoGUI
 
-## Version Control Best Practices
-
-1. Always create a new branch for features:
-```bash
-git checkout -b feature/new-feature
-```
-
-2. Test changes locally before pushing:
-```bash
-streamlit run voice_keyboard.py
-```
-
-3. Create meaningful commit messages:
-```bash
-git commit -m "Add: new voice command for [feature]"
-```
-
-4. Merge changes through pull requests for better tracking
-
-## Prerequisites
-
-- Python 3.7 or higher
-- A working microphone
-- Internet connection (for Google Speech Recognition)
-
-## Usage
-
-1. Run the application:
-```bash
-streamlit run voice_keyboard.py
-```
-
-2. Click the "Start Listening" button to begin voice recognition
-3. Speak your commands clearly
-4. Click "Stop" when you're done
-
-## Voice Commands
-
-- Regular text: Just speak normally
-- Capitalization: Say "Capital [word]"
-- New line: Say "Press enter" or "next line"
-- Special keys: Say "Press [key]" where key can be:
-  - enter
-  - space
-  - tab
-  - backspace
-  - delete
-  - escape
-
-## Examples
-
-- "My name is John press enter"
-- "Capital Hello world"
-- "Press tab"
-- "This is a new sentence press enter"
-
-## Note
-
-The application uses Google Speech Recognition API, so an internet connection is required for voice recognition to work. 
+3. Common Issues:
+   - "PyAudio not found": Follow installation steps for PyAudio
+   - "Microphone not detected": Check Windows sound settings
+   - "Command not recognized": Speak clearly and check command list 
