@@ -5,13 +5,37 @@ import time
 import re
 import platform
 import sys
+import os
 
-# Check if running locally or in cloud
-IS_CLOUD = not sys.platform.startswith('win') and not sys.platform.startswith('darwin') and not sys.platform.startswith('linux')
+# Check if running in cloud or if display is available
+IS_CLOUD = True  # Default to cloud/no-display mode
+try:
+    # Only try to import pyautogui if we're in a suitable environment
+    if sys.platform.startswith('win'):  # Windows
+        import pyautogui
+        IS_CLOUD = False
+    elif sys.platform.startswith('darwin'):  # macOS
+        import pyautogui
+        IS_CLOUD = False
+    elif sys.platform.startswith('linux'):  # Linux
+        # Check if running in a desktop environment
+        if os.environ.get('DISPLAY') or os.environ.get('WAYLAND_DISPLAY'):
+            import pyautogui
+            IS_CLOUD = False
+        else:
+            st.warning("No display available. Running in cloud/demo mode.")
+except ImportError:
+    st.warning("PyAutoGUI not available. Running in cloud/demo mode.")
+except Exception as e:
+    st.warning(f"Display access error. Running in cloud/demo mode. Error: {str(e)}")
 
+# Initialize PyAutoGUI if available
 if not IS_CLOUD:
-    import pyautogui
-    pyautogui.FAILSAFE = False
+    try:
+        pyautogui.FAILSAFE = False
+    except Exception:
+        IS_CLOUD = True
+        st.warning("Failed to initialize PyAutoGUI. Running in cloud/demo mode.")
 
 class VoiceKeyboard:
     def __init__(self):
@@ -163,7 +187,13 @@ class VoiceKeyboard:
         """Execute a command with proper timing"""
         if IS_CLOUD:
             # In cloud environment, just display the command
-            st.write(f"Command received: {command}")
+            if isinstance(command, list):
+                if isinstance(command[0], list):
+                    st.write(f"Command sequence received: {command}")
+                else:
+                    st.write(f"Hotkey command received: {'+'.join(command)}")
+            else:
+                st.write(f"Key command received: {command}")
             return False
             
         if command == 'stop':
@@ -184,13 +214,15 @@ class VoiceKeyboard:
             time.sleep(0.05)
         except Exception as e:
             st.error(f"Error executing command: {str(e)}")
+            IS_CLOUD = True  # Switch to cloud mode if command execution fails
         
         return False
 
     def type_symbol(self, symbol_name):
         """Handle typing of symbols"""
         if IS_CLOUD:
-            st.write(f"Symbol typed: {self.symbols.get(symbol_name, '')}")
+            symbol = self.symbols.get(symbol_name, '')
+            st.write(f"Symbol command received: {symbol_name} ({symbol})")
             return True
             
         if symbol_name in self.symbols:
@@ -205,6 +237,7 @@ class VoiceKeyboard:
                 return True
             except Exception as e:
                 st.error(f"Error typing symbol: {str(e)}")
+                IS_CLOUD = True  # Switch to cloud mode if symbol typing fails
         return False
 
     def speak(self, text):
@@ -299,24 +332,33 @@ def main():
     st.set_page_config(page_title="Voice Keyboard Assistant", page_icon="🎤")
     st.title("Voice Keyboard Assistant 🎤")
     
-    # Display cloud deployment warning
+    # Display environment information
     if IS_CLOUD:
         st.warning("""
-        ⚠️ **Cloud Deployment Notice**
+        ⚠️ **Cloud/Demo Mode Active**
         
-        This application is running in a cloud environment where keyboard control features are limited.
-        For full functionality, please run this application locally on your computer.
+        This application is running in a limited environment where keyboard control features are not available.
+        The application will demonstrate voice recognition and show what actions would be taken.
         
-        Current features available in cloud:
+        For full functionality including keyboard control:
+        1. Download and run the application locally
+        2. Make sure you have a display/desktop environment
+        3. Run `streamlit run voice_keyboard.py`
+        
+        Current features available:
         - Voice recognition
         - Command detection
         - Command visualization
-        
-        To run locally:
-        1. Clone the repository
-        2. Install dependencies
-        3. Run `streamlit run voice_keyboard.py`
         """)
+    else:
+        st.success("✅ Running in full functionality mode with keyboard control enabled.")
+    
+    # Display system information
+    with st.expander("System Information"):
+        st.write(f"Platform: {platform.platform()}")
+        st.write(f"Python Version: {platform.python_version()}")
+        st.write(f"Display Available: {bool(os.environ.get('DISPLAY') or os.environ.get('WAYLAND_DISPLAY'))}")
+        st.write(f"Mode: {'Cloud/Demo' if IS_CLOUD else 'Full Functionality'}")
     
     voice_keyboard = VoiceKeyboard()
     
