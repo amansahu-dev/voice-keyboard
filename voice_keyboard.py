@@ -1,14 +1,32 @@
 import speech_recognition as sr
-import pyautogui
 import streamlit as st
 import pyttsx3
 import time
 import re
+import platform
+import sys
+
+# Check if running locally or in cloud
+IS_CLOUD = not sys.platform.startswith('win') and not sys.platform.startswith('darwin') and not sys.platform.startswith('linux')
+
+if not IS_CLOUD:
+    import pyautogui
+    pyautogui.FAILSAFE = False
 
 class VoiceKeyboard:
     def __init__(self):
         self.recognizer = sr.Recognizer()
-        self.engine = pyttsx3.init()
+        
+        # Initialize text-to-speech only if not in cloud
+        if not IS_CLOUD:
+            try:
+                self.engine = pyttsx3.init()
+                self.engine.setProperty('rate', 150)
+            except Exception as e:
+                st.warning(f"Text-to-speech initialization failed: {str(e)}")
+                self.engine = None
+        else:
+            self.engine = None
         
         # Fix speech recognition settings
         self.recognizer.pause_threshold = 0.8
@@ -141,23 +159,62 @@ class VoiceKeyboard:
             'tilde': '~'
         }
 
-    def speak(self, text):
-        """Text to speech feedback"""
-        self.engine.say(text)
-        self.engine.runAndWait()
+    def execute_command(self, command):
+        """Execute a command with proper timing"""
+        if IS_CLOUD:
+            # In cloud environment, just display the command
+            st.write(f"Command received: {command}")
+            return False
+            
+        if command == 'stop':
+            return True
+        
+        try:
+            if isinstance(command, list):
+                # Handle nested commands (for complex operations)
+                if isinstance(command[0], list):
+                    for cmd in command:
+                        pyautogui.hotkey(*cmd)
+                        time.sleep(0.1)
+                else:
+                    pyautogui.hotkey(*command)
+            else:
+                pyautogui.press(command)
+            
+            time.sleep(0.05)
+        except Exception as e:
+            st.error(f"Error executing command: {str(e)}")
+        
+        return False
 
     def type_symbol(self, symbol_name):
         """Handle typing of symbols"""
-        if symbol_name in self.symbols:
-            symbol = self.symbols[symbol_name]
-            if len(symbol) == 2:  # For paired symbols like (), [], {}
-                pyautogui.write(symbol[0])
-                pyautogui.write(symbol[1])
-                pyautogui.press('left')  # Move cursor between the symbols
-            else:
-                pyautogui.write(symbol)
+        if IS_CLOUD:
+            st.write(f"Symbol typed: {self.symbols.get(symbol_name, '')}")
             return True
+            
+        if symbol_name in self.symbols:
+            try:
+                symbol = self.symbols[symbol_name]
+                if len(symbol) == 2:  # For paired symbols like (), [], {}
+                    pyautogui.write(symbol[0])
+                    pyautogui.write(symbol[1])
+                    pyautogui.press('left')
+                else:
+                    pyautogui.write(symbol)
+                return True
+            except Exception as e:
+                st.error(f"Error typing symbol: {str(e)}")
         return False
+
+    def speak(self, text):
+        """Text to speech feedback"""
+        if not IS_CLOUD and self.engine:
+            try:
+                self.engine.say(text)
+                self.engine.runAndWait()
+            except Exception as e:
+                st.warning(f"Text-to-speech failed: {str(e)}")
 
     def process_command(self, text):
         """Process the voice command and perform actions"""
@@ -213,24 +270,6 @@ class VoiceKeyboard:
 
         return False
 
-    def execute_command(self, command):
-        """Execute a command with proper timing"""
-        if command == 'stop':
-            return True
-        
-        if isinstance(command, list):
-            # Handle nested commands (for complex operations)
-            if isinstance(command[0], list):
-                for cmd in command:
-                    pyautogui.hotkey(*cmd)
-                    time.sleep(0.1)  # Slightly increased delay for reliability
-            else:
-                pyautogui.hotkey(*command)
-        else:
-            pyautogui.press(command)
-        
-        time.sleep(0.05)  # Small delay after each command
-
     def listen(self):
         """Listen for voice input"""
         with sr.Microphone() as source:
@@ -259,6 +298,25 @@ class VoiceKeyboard:
 def main():
     st.set_page_config(page_title="Voice Keyboard Assistant", page_icon="🎤")
     st.title("Voice Keyboard Assistant 🎤")
+    
+    # Display cloud deployment warning
+    if IS_CLOUD:
+        st.warning("""
+        ⚠️ **Cloud Deployment Notice**
+        
+        This application is running in a cloud environment where keyboard control features are limited.
+        For full functionality, please run this application locally on your computer.
+        
+        Current features available in cloud:
+        - Voice recognition
+        - Command detection
+        - Command visualization
+        
+        To run locally:
+        1. Clone the repository
+        2. Install dependencies
+        3. Run `streamlit run voice_keyboard.py`
+        """)
     
     voice_keyboard = VoiceKeyboard()
     
