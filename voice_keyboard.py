@@ -185,6 +185,9 @@ def main():
     tab1, tab2 = st.tabs(["Main", "Help"])
     
     with tab1:
+        # Add test textbox at the top
+        st.text_area("Test your voice commands here:", height=200, key="test_area")
+        
         col1, col2 = st.columns([1, 2])
         
         with col1:
