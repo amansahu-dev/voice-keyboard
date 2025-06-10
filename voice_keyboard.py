@@ -7,6 +7,9 @@ import platform
 import sys
 import os
 
+# Must be the first Streamlit command
+st.set_page_config(page_title="Voice Keyboard Assistant", page_icon="🎤")
+
 # Check if running in cloud or if display is available
 IS_CLOUD = True  # Default to cloud/no-display mode
 try:
@@ -23,11 +26,13 @@ try:
             import pyautogui
             IS_CLOUD = False
         else:
-            st.warning("No display available. Running in cloud/demo mode.")
+            st.info("No display available. Running in cloud/demo mode.")
+    else:
+        st.info("Unsupported platform. Running in cloud/demo mode.")
 except ImportError:
-    st.warning("PyAutoGUI not available. Running in cloud/demo mode.")
+    st.info("PyAutoGUI not available. Running in cloud/demo mode.")
 except Exception as e:
-    st.warning(f"Display access error. Running in cloud/demo mode. Error: {str(e)}")
+    st.info(f"Display access error. Running in cloud/demo mode. Error: {str(e)}")
 
 # Initialize PyAutoGUI if available
 if not IS_CLOUD:
@@ -35,7 +40,7 @@ if not IS_CLOUD:
         pyautogui.FAILSAFE = False
     except Exception:
         IS_CLOUD = True
-        st.warning("Failed to initialize PyAutoGUI. Running in cloud/demo mode.")
+        st.info("Failed to initialize PyAutoGUI. Running in cloud/demo mode.")
 
 class VoiceKeyboard:
     def __init__(self):
@@ -47,7 +52,7 @@ class VoiceKeyboard:
                 self.engine = pyttsx3.init()
                 self.engine.setProperty('rate', 150)
             except Exception as e:
-                st.warning(f"Text-to-speech initialization failed: {str(e)}")
+                st.info(f"Text-to-speech initialization failed: {str(e)}")
                 self.engine = None
         else:
             self.engine = None
@@ -329,89 +334,81 @@ class VoiceKeyboard:
                 return ""
 
 def main():
-    st.set_page_config(page_title="Voice Keyboard Assistant", page_icon="🎤")
     st.title("Voice Keyboard Assistant 🎤")
     
-    # Display environment information
-    if IS_CLOUD:
-        st.warning("""
-        ⚠️ **Cloud/Demo Mode Active**
-        
-        This application is running in a limited environment where keyboard control features are not available.
-        The application will demonstrate voice recognition and show what actions would be taken.
-        
-        For full functionality including keyboard control:
-        1. Download and run the application locally
-        2. Make sure you have a display/desktop environment
-        3. Run `streamlit run voice_keyboard.py`
-        
-        Current features available:
-        - Voice recognition
-        - Command detection
-        - Command visualization
-        """)
-    else:
-        st.success("✅ Running in full functionality mode with keyboard control enabled.")
+    # Create tabs for different sections
+    main_tab, info_tab = st.tabs(["Main", "System Information"])
     
-    # Display system information
-    with st.expander("System Information"):
+    with main_tab:
+        # Display environment information
+        if IS_CLOUD:
+            st.warning("""
+            ⚠️ **Cloud/Demo Mode Active**
+            
+            This application is running in a limited environment where keyboard control features are not available.
+            The application will demonstrate voice recognition and show what actions would be taken.
+            
+            For full functionality including keyboard control:
+            1. Download and run the application locally
+            2. Make sure you have a display/desktop environment
+            3. Run `streamlit run voice_keyboard.py`
+            
+            Current features available:
+            - Voice recognition
+            - Command detection
+            - Command visualization
+            """)
+        else:
+            st.success("✅ Running in full functionality mode with keyboard control enabled.")
+        
+        voice_keyboard = VoiceKeyboard()
+        
+        # Create a test textarea
+        test_text = st.text_area("Test your voice commands here:", height=200)
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            if st.button("Start Listening", type="primary"):
+                st.session_state.listening = True
+                st.success("Listening... Speak now!")
+                
+                while st.session_state.get('listening', False):
+                    text = voice_keyboard.listen()
+                    if text:
+                        st.write(f"Recognized: {text}")
+                        should_stop = voice_keyboard.process_command(text)
+                        if should_stop:
+                            st.session_state.listening = False
+                            st.info("Stopped listening")
+                            break
+                    time.sleep(0.05)
+        
+        with col2:
+            if st.button("Stop", type="secondary"):
+                st.session_state.listening = False
+                st.info("Stopped listening")
+    
+    with info_tab:
+        # Display system information
+        st.write("### System Information")
         st.write(f"Platform: {platform.platform()}")
         st.write(f"Python Version: {platform.python_version()}")
         st.write(f"Display Available: {bool(os.environ.get('DISPLAY') or os.environ.get('WAYLAND_DISPLAY'))}")
         st.write(f"Mode: {'Cloud/Demo' if IS_CLOUD else 'Full Functionality'}")
-    
-    voice_keyboard = VoiceKeyboard()
-    
-    st.markdown("""
-    ### Instructions:
-    1. Click 'Start Listening' to begin voice recognition
-    2. Speak your commands clearly
-    3. Use commands like:
+        
+        # Display available commands
+        st.write("### Available Commands")
+        st.write("""
         - Regular text: Just speak normally
         - Stop Commands: "Stop listening", "Stop now", "Finish"
         - Delete: "Remove word", "Delete word", "Back word"
-        - Basic Navigation: "Go left", "Go right", "Word left", "Word right"
+        - Navigation: "Go left", "Go right", "Word left", "Word right"
         - Advanced Navigation: "Go to start", "Go to end", "Line start", "Line end"
         - Copy/Paste: "Copy line", "Copy word", "Paste", "Cut line"
         - Selection: "Select word", "Select line", "Select up", "Select down"
         - Symbols: "Double quote", "Open bracket", "Comma", etc.
-    4. Say "Stop listening" or "Stop now" to end the session
-    
-    ### Available Commands:
-    - Stop: "Stop listening", "Stop now", "Finish", "End recording"
-    - Navigation: "Go to start", "Go to end", "Line start", "Line end"
-    - Copy/Paste: "Copy", "Paste", "Cut", "Copy line", "Copy word"
-    - Selection: "Select all", "Select word", "Select line"
-    - Delete: "Remove word", "Delete word", "Back word"
-    
-    ### Test Area:
-    """)
-    
-    # Create a test textarea
-    test_text = st.text_area("Test your voice commands here:", height=200)
-    
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        if st.button("Start Listening", type="primary"):
-            st.session_state.listening = True
-            st.success("Listening... Speak now! (Say 'Stop listening' to end)")
-            
-            while st.session_state.get('listening', False):
-                text = voice_keyboard.listen()
-                if text:
-                    st.write(f"Recognized: {text}")
-                    should_stop = voice_keyboard.process_command(text)
-                    if should_stop:
-                        st.session_state.listening = False
-                        st.info("Stopped listening")
-                        break
-                time.sleep(0.05)  # Reduced sleep time for better responsiveness
-    
-    with col2:
-        if st.button("Stop", type="secondary"):
-            st.session_state.listening = False
-            st.info("Stopped listening")
+        """)
 
 if __name__ == "__main__":
     main() 
